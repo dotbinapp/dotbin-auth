@@ -13,10 +13,12 @@ function normalizeEmail(email) {
   return String(email).trim().toLowerCase();
 }
 
+/** Respuesta pública: identificador principal = userId + clientId */
 function toPublicUser(user) {
   if (!user) return null;
   return {
-    id: user.id,
+    userId: user.id,
+    clientId: user.clientId,
     email: user.email,
     name: user.name,
     status: user.status,
@@ -31,15 +33,17 @@ class IdentityUserService {
     this.userStore = userStore;
   }
 
-  async createUser({ email, password, name }) {
+  async createUser({ clientId, email, password, name }) {
+    const cid = String(clientId).trim();
     const normalizedEmail = normalizeEmail(email);
-    const existing = await this.userStore.findByEmail(normalizedEmail);
+    const existing = await this.userStore.findByEmailAndClientId(normalizedEmail, cid);
     if (existing) {
       ErrorApi.throw(ErrorApi.codes.AUTH_ERROR_EMAIL_IN_USE);
     }
 
     const passwordHash = await hashPassword(password);
     const user = await this.userStore.create({
+      clientId: cid,
       email: normalizedEmail,
       passwordHash,
       name: name != null ? String(name).trim() || null : null,
@@ -48,16 +52,17 @@ class IdentityUserService {
     return toPublicUser(user);
   }
 
-  async getUserById(id) {
-    const user = await this.userStore.findById(id);
+  async getUserByUserIdAndClientId(userId, clientId) {
+    const user = await this.userStore.findByUserIdAndClientId(userId, String(clientId).trim());
     if (!user) {
       ErrorApi.throw(ErrorApi.codes.AUTH_ERROR_USER_NOT_FOUND);
     }
     return toPublicUser(user);
   }
 
-  async updateUser(id, { email, name }) {
-    const existing = await this.userStore.findById(id);
+  async updateUser(userId, clientId, { email, name }) {
+    const cid = String(clientId).trim();
+    const existing = await this.userStore.findByUserIdAndClientId(userId, cid);
     if (!existing) {
       ErrorApi.throw(ErrorApi.codes.AUTH_ERROR_USER_NOT_FOUND);
     }
@@ -66,7 +71,7 @@ class IdentityUserService {
     if (email !== undefined) {
       const next = normalizeEmail(email);
       if (next !== existing.email) {
-        const taken = await this.userStore.findByEmail(next);
+        const taken = await this.userStore.findByEmailAndClientIdExcludingUser(next, cid, existing.id);
         if (taken) {
           ErrorApi.throw(ErrorApi.codes.AUTH_ERROR_EMAIL_IN_USE);
         }
@@ -81,34 +86,32 @@ class IdentityUserService {
       return toPublicUser(existing);
     }
 
-    const user = await this.userStore.updateById(id, data);
+    const user = await this.userStore.updateById(existing.id, data);
     return toPublicUser(user);
   }
 
-  async deactivateUser(id) {
-    const user = await this.userStore.findById(id);
+  async deactivateUser(userId, clientId) {
+    const user = await this.userStore.findByUserIdAndClientId(userId, String(clientId).trim());
     if (!user) {
       ErrorApi.throw(ErrorApi.codes.AUTH_ERROR_USER_NOT_FOUND);
     }
-    const updated = await this.userStore.updateById(id, { status: 'INACTIVE' });
+    const updated = await this.userStore.updateById(user.id, { status: 'INACTIVE' });
     return toPublicUser(updated);
   }
 
-  async activateUser(id) {
-    const user = await this.userStore.findById(id);
+  async activateUser(userId, clientId) {
+    const user = await this.userStore.findByUserIdAndClientId(userId, String(clientId).trim());
     if (!user) {
       ErrorApi.throw(ErrorApi.codes.AUTH_ERROR_USER_NOT_FOUND);
     }
-    const updated = await this.userStore.updateById(id, { status: 'ACTIVE' });
+    const updated = await this.userStore.updateById(user.id, { status: 'ACTIVE' });
     return toPublicUser(updated);
   }
 
-  /**
-   * Cambio de contraseña con la anterior (flujo conocido por el usuario).
-   */
-  async changePasswordWithCurrent({ email, currentPassword, newPassword }) {
+  async changePasswordWithCurrent({ clientId, email, currentPassword, newPassword }) {
+    const cid = String(clientId).trim();
     const normalizedEmail = normalizeEmail(email);
-    const user = await this.userStore.findByEmail(normalizedEmail);
+    const user = await this.userStore.findByEmailAndClientId(normalizedEmail, cid);
     if (!user) {
       ErrorApi.throw(ErrorApi.codes.AUTH_ERROR_INVALID_CREDENTIALS);
     }
@@ -127,13 +130,10 @@ class IdentityUserService {
     return { ok: true };
   }
 
-  /**
-   * Solicitud de reset: genera token opaco; mismo mensaje si el email no existe (no filtrar).
-   * @returns {{ ok: true, resetToken?: string }} resetToken solo si RETURN_RESET_TOKEN_IN_RESPONSE=true
-   */
-  async requestPasswordReset(email) {
+  async requestPasswordReset(email, clientId) {
+    const cid = String(clientId).trim();
     const normalizedEmail = normalizeEmail(email);
-    const user = await this.userStore.findByEmail(normalizedEmail);
+    const user = await this.userStore.findByEmailAndClientId(normalizedEmail, cid);
 
     const genericOk = { ok: true };
 
@@ -154,9 +154,6 @@ class IdentityUserService {
     return genericOk;
   }
 
-  /**
-   * Confirma nueva contraseña con el token enviado por email (o dev).
-   */
   async confirmPasswordReset({ token, newPassword }) {
     if (!token || !newPassword) {
       ErrorApi.throw(ErrorApi.codes.AUTH_ERROR_INVALID_PARAMS);

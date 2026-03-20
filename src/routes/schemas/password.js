@@ -1,12 +1,14 @@
 const Joi = require('joi');
 
 const changeWithCurrentBody = Joi.object({
+  clientId: Joi.string().min(1).max(128).required(),
   email: Joi.string().email().required(),
   currentPassword: Joi.string().min(1).required(),
   newPassword: Joi.string().min(8).max(128).required(),
 });
 
 const resetRequestBody = Joi.object({
+  clientId: Joi.string().min(1).max(128).required(),
   email: Joi.string().email().required(),
 });
 

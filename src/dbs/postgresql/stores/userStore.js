@@ -1,7 +1,7 @@
 const { getPostgresClient } = require('../index');
 
 /**
- * Persistencia de usuarios de identidad (credenciales).
+ * Persistencia de usuarios de identidad (credenciales), scoped por clientId (inquilino).
  */
 class UserStore {
   constructor() {
@@ -14,10 +14,24 @@ class UserStore {
 
   /**
    * @param {string} email normalizado en minúsculas
+   * @param {string} clientId
    */
-  async findByEmail(email) {
+  async findByEmailAndClientId(email, clientId) {
     return this._prisma().identityUser.findUnique({
-      where: { email },
+      where: {
+        clientId_email: { clientId, email },
+      },
+    });
+  }
+
+  /**
+   * userId = id de IdentityUser (generado por dotbin-auth).
+   * @param {string} userId
+   * @param {string} clientId
+   */
+  async findByUserIdAndClientId(userId, clientId) {
+    return this._prisma().identityUser.findFirst({
+      where: { id: userId, clientId },
     });
   }
 
@@ -64,6 +78,16 @@ class UserStore {
       where: {
         passwordResetTokenHash,
         passwordResetExpiresAt: { gt: new Date() },
+      },
+    });
+  }
+
+  async findByEmailAndClientIdExcludingUser(email, clientId, excludeUserId) {
+    return this._prisma().identityUser.findFirst({
+      where: {
+        clientId,
+        email,
+        NOT: { id: excludeUserId },
       },
     });
   }

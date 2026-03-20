@@ -1,60 +1,56 @@
 # dotbin-auth
 
-Microservicio de identidad: usuarios locales (email + contraseña), reset por token y emisión de JWT. Estructura alineada con **dotbin-server** (`routes`, `services` singleton, `dbs/.../stores`, `config` JSON).
+Microservicio de identidad genérico: usuarios por **inquilino** (`clientId`), email + contraseña, reset por token y emisión de JWT.
+
+## Identificador principal
+
+La identidad se define por **`userId` + `clientId`**:
+
+- **`userId`**: `id` generado por dotbin-auth (cuid).
+- **`clientId`**: identificador del inquilino. Ejemplos:
+  - Id de **centro** (dotbin por clínica).
+  - Consola **admin dotbin** (un `clientId` fijo acordado para operadores globales).
+  - Otro producto o integración que use el mismo servicio.
+
+El **email** es único **por `clientId`** (`@@unique([clientId, email])`). Podés documentar convenciones (p. ej. `clientId = centerId` para apps de centro) en dotbin-server sin cambiar este servicio.
 
 ## Arranque
 
 ```bash
 cp .env.example .env
-# Edita DATABASE_URL e INTERNAL_API_KEY (mínimo 8 caracteres)
 npm install
 npx prisma generate
-npx prisma db push   # o: npm run db:migrate
+npx prisma db push
 npm run dev
 ```
 
-- API base: `http://localhost:4100/v1` (`src/config/swagger.json`).
+- API base: `http://localhost:4100/v1`
 - JWKS: `GET /.well-known/jwks.json`
 
-## Usuario de identidad (Prisma `IdentityUser`)
-
-Campos principales: `email` único, `passwordHash` (bcrypt), `name`, `status` ACTIVE/INACTIVE, campos opcionales para reset (`passwordResetTokenHash`, `passwordResetExpiresAt`).
-
-### CRUD interno (requiere `x-api-key: <INTERNAL_API_KEY>`)
-
-Llamadas típicas desde **dotbin-server** al crear admins, etc.
+## CRUD interno (`x-api-key: <INTERNAL_API_KEY>`)
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `POST` | `/v1/users` | Crear usuario `{ email, password, name? }` |
-| `GET` | `/v1/users/:id` | Obtener usuario (sin hash) |
-| `PATCH` | `/v1/users/:id` | Editar `{ email?, name? }` (sin contraseña) |
-| `POST` | `/v1/users/:id/deactivate` | Desactivar |
-| `POST` | `/v1/users/:id/activate` | Activar |
+| `POST` | `/v1/users` | `{ clientId, email, password, name? }` |
+| `GET` | `/v1/users/:clientId/:userId` | Obtener |
+| `PATCH` | `/v1/users/:clientId/:userId` | Editar `{ email?, name? }` |
+| `POST` | `/v1/users/:clientId/:userId/deactivate` | Desactivar |
+| `POST` | `/v1/users/:clientId/:userId/activate` | Activar |
 
-### Contraseña (público, sin API key)
+## Contraseña y sesión (público)
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| `POST` | `/v1/auth/password/change` | `{ email, currentPassword, newPassword }` |
-| `POST` | `/v1/auth/password-reset/request` | `{ email }` — respuesta siempre `{ ok: true }`; si `RETURN_RESET_TOKEN_IN_RESPONSE=true` incluye `resetToken` (solo dev) |
+| Método | Ruta | Body relevante |
+|--------|------|----------------|
+| `POST` | `/v1/auth/password/change` | `{ clientId, email, currentPassword, newPassword }` |
+| `POST` | `/v1/auth/password-reset/request` | `{ clientId, email }` |
 | `POST` | `/v1/auth/password-reset/confirm` | `{ token, newPassword }` |
-
-### Sesión (pendiente JWT completo en `TokenService`)
-
-| Método | Ruta |
-|--------|------|
-| `POST` | `/v1/auth/session/login` |
+| `POST` | `/v1/auth/session/login` | `{ clientId, email, password }` |
 
 ## Variables de entorno
 
-- `DATABASE_URL` — obligatoria para arrancar con DB.
-- `INTERNAL_API_KEY` — obligatoria para `/v1/users/*`.
-- `RETURN_RESET_TOKEN_IN_RESPONSE` — `true` solo en desarrollo para probar el flujo de reset sin email.
-- `PASSWORD_RESET_EXPIRES_MINUTES` — default `60`.
-- `BCRYPT_ROUNDS` — default `12`.
+`DATABASE_URL`, `INTERNAL_API_KEY`, `RETURN_RESET_TOKEN_IN_RESPONSE`, `PASSWORD_RESET_EXPIRES_MINUTES`, `BCRYPT_ROUNDS`.
 
-## Modelo con dotbin-server
+## Integración con dotbin-server
 
-- **Identidad** (este repo): credenciales + `id` estable.
-- **Negocio** (`CenterUser` en dotbin-server): enlazar `auth0UserId` → sustituir por el `id` devuelto al crear usuario aquí.
+- Para usuarios de **centro**: `clientId` = id del `Center` en tu API de negocio.
+- Para **admin dotbin**: definir un `clientId` reservado (constante o config) y crear identidades ahí; el JWT llevará `clientId` para que el backend distinga contexto.

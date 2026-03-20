@@ -3,7 +3,7 @@ const credentialService = require('./CredentialService');
 const ErrorApi = require('../modules/ErrorApi');
 
 /**
- * Orquesta login local (email/contraseña) → tokens de sesión (access/refresh).
+ * Orquesta login local (email/contraseña/clientId) → tokens de sesión (access/refresh).
  */
 class SessionService {
   constructor() {
@@ -13,12 +13,13 @@ class SessionService {
   }
 
   /**
-   * @param {{ email: string, password: string }} input
+   * @param {{ email: string, password: string, clientId: string }} input
    */
   async createSessionFromCredentials(input) {
     const user = await this.credentialService.validateCredentials(input);
     return tokenService.signAccessToken({
-      sub: user.id,
+      sub: user.userId,
+      clientId: user.clientId,
       email: user.email,
     });
   }

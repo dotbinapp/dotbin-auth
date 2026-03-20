@@ -12,9 +12,13 @@ enum IdentityUserStatus {
   INACTIVE
 }
 
+/// Inquilino genérico: centro, consola admin dotbin, otro producto, etc.
+/// Clave lógica: userId + clientId. userId = id (cuid).
+/// Email único por clientId; reglas globales opcionales arriba de esto.
 model IdentityUser {
   id                     String             @id @default(cuid())
-  email                  String             @unique
+  clientId               String
+  email                  String
   passwordHash           String
   name                   String?
   status                 IdentityUserStatus @default(ACTIVE)
@@ -22,4 +26,7 @@ model IdentityUser {
   passwordResetExpiresAt DateTime?
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
+
+  @@unique([clientId, email])
+  @@index([clientId])
 }

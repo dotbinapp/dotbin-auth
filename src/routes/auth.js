@@ -16,8 +16,8 @@ router.post(
   validateSchema(config.joi.schemaTypes.body, schemas.loginBody),
   async (req, res, next) => {
     try {
-      const { email, password } = req.body;
-      const result = await sessionService.createSessionFromCredentials({ email, password });
+      const { clientId, email, password } = req.body;
+      const result = await sessionService.createSessionFromCredentials({ clientId, email, password });
       res.status(200).json({ ok: true, ...result });
     } catch (err) {
       next(err);
@@ -65,7 +65,12 @@ router.post(
   validateSchema(config.joi.schemaTypes.body, passwordSchemas.changeWithCurrentBody),
   async (req, res, next) => {
     try {
-      const result = await identityUserService.changePasswordWithCurrent(req.body);
+      const result = await identityUserService.changePasswordWithCurrent({
+        clientId: req.body.clientId,
+        email: req.body.email,
+        currentPassword: req.body.currentPassword,
+        newPassword: req.body.newPassword,
+      });
       res.json(result);
     } catch (err) {
       next(err);
@@ -81,7 +86,7 @@ router.post(
   validateSchema(config.joi.schemaTypes.body, passwordSchemas.resetRequestBody),
   async (req, res, next) => {
     try {
-      const result = await identityUserService.requestPasswordReset(req.body.email);
+      const result = await identityUserService.requestPasswordReset(req.body.email, req.body.clientId);
       res.json(result);
     } catch (err) {
       next(err);

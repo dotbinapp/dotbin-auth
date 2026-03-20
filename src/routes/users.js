@@ -23,11 +23,12 @@ router.post(
 );
 
 router.get(
-  '/:id',
-  validateSchema(config.joi.schemaTypes.params, schemas.idParam),
+  '/:clientId/:userId',
+  validateSchema(config.joi.schemaTypes.params, schemas.clientAndUserParams),
   async (req, res, next) => {
     try {
-      const user = await identityUserService.getUserById(req.params.id);
+      const { clientId, userId } = req.params;
+      const user = await identityUserService.getUserByUserIdAndClientId(userId, clientId);
       res.json({ ok: true, user });
     } catch (err) {
       next(err);
@@ -36,12 +37,13 @@ router.get(
 );
 
 router.patch(
-  '/:id',
-  validateSchema(config.joi.schemaTypes.params, schemas.idParam),
+  '/:clientId/:userId',
+  validateSchema(config.joi.schemaTypes.params, schemas.clientAndUserParams),
   validateSchema(config.joi.schemaTypes.body, schemas.updateBody),
   async (req, res, next) => {
     try {
-      const user = await identityUserService.updateUser(req.params.id, req.body);
+      const { clientId, userId } = req.params;
+      const user = await identityUserService.updateUser(userId, clientId, req.body);
       res.json({ ok: true, user });
     } catch (err) {
       next(err);
@@ -50,11 +52,12 @@ router.patch(
 );
 
 router.post(
-  '/:id/deactivate',
-  validateSchema(config.joi.schemaTypes.params, schemas.idParam),
+  '/:clientId/:userId/deactivate',
+  validateSchema(config.joi.schemaTypes.params, schemas.clientAndUserParams),
   async (req, res, next) => {
     try {
-      const user = await identityUserService.deactivateUser(req.params.id);
+      const { clientId, userId } = req.params;
+      const user = await identityUserService.deactivateUser(userId, clientId);
       res.json({ ok: true, user });
     } catch (err) {
       next(err);
@@ -63,11 +66,12 @@ router.post(
 );
 
 router.post(
-  '/:id/activate',
-  validateSchema(config.joi.schemaTypes.params, schemas.idParam),
+  '/:clientId/:userId/activate',
+  validateSchema(config.joi.schemaTypes.params, schemas.clientAndUserParams),
   async (req, res, next) => {
     try {
-      const user = await identityUserService.activateUser(req.params.id);
+      const { clientId, userId } = req.params;
+      const user = await identityUserService.activateUser(userId, clientId);
       res.json({ ok: true, user });
     } catch (err) {
       next(err);

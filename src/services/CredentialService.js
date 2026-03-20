@@ -7,7 +7,7 @@ function normalizeEmail(email) {
 }
 
 /**
- * Valida credenciales contra usuarios alojados en este servicio (sin Auth0 ni OIDC).
+ * Valida credenciales en el ámbito de un inquilino (clientId): email + password.
  */
 class CredentialService {
   constructor() {
@@ -16,12 +16,13 @@ class CredentialService {
   }
 
   /**
-   * @param {{ email: string, password: string }} input
-   * @returns {Promise<{ id: string, email: string }>}
+   * Identidad principal: { userId, clientId, email } tras login correcto.
+   * @param {{ email: string, password: string, clientId: string }} input
    */
   async validateCredentials(input) {
-    const { email, password } = input;
-    const user = await this.userStore.findByEmail(normalizeEmail(email));
+    const { email, password, clientId } = input;
+    const cid = String(clientId).trim();
+    const user = await this.userStore.findByEmailAndClientId(normalizeEmail(email), cid);
 
     if (!user) {
       ErrorApi.throw(ErrorApi.codes.AUTH_ERROR_INVALID_CREDENTIALS);
@@ -36,7 +37,11 @@ class CredentialService {
       ErrorApi.throw(ErrorApi.codes.AUTH_ERROR_INVALID_CREDENTIALS);
     }
 
-    return { id: user.id, email: user.email };
+    return {
+      userId: user.id,
+      clientId: user.clientId,
+      email: user.email,
+    };
   }
 }
 
