@@ -1,0 +1,5 @@
+{
+  "postgresql": {
+    "url": "${DATABASE_URL}"
+  }
+}

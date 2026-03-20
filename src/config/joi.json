@@ -1,0 +1,7 @@
+{
+  "schemaTypes": {
+    "body": "body",
+    "query": "query",
+    "params": "params"
+  }
+}
